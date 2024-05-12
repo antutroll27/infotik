@@ -1,115 +1,78 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { Dimensions, FlatList, View, StyleSheet } from 'react-native';
+import useMaterialNavBarHeight from '../hooks/useMaterialNavBarHeight';
+import PostSingle from './post';
+import { useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 
-import React, { useEffect, useRef, useState } from 'react'
-import { Dimensions, FlatList, View, StyleSheet, Text } from 'react-native'
-import useMaterialNavBarHeight from '../hooks/useMaterialNavBarHeight'
-import PostSingle from './post'
-import { useSelector } from 'react-redux'
-import { useNavigation } from '@react-navigation/native'
-// import { getFeed, getPostsByUserId } from '../../services/posts'
-
-
-
-
-
-export default function Scroller({ posts:allposts,change,profile }) {
-    const [posts, setPosts] = useState(allposts)
+export default function Scroller({ posts: allPosts, change, profile }) {
+    const [posts, setPosts] = useState(allPosts);
     const isScrollTab = useRef(true);
-    
-    
-    const mediaRefs = useRef([])
+    const mediaRefs = useRef([]);
     const storeCellRef = useRef([]);
-    
     const currentVideoRes = useRef(null);
-    
-    const navigation = useNavigation()
+    const navigation = useNavigation();
 
-    const {change:pagechange} = useSelector(store => store.user);
-
-    useEffect(() => {
-        setPosts(allposts);
-    },[posts,change])
-
-
- 
-
+    const { change: pageChange } = useSelector(store => store.user);
 
     useEffect(() => {
-        console.log('mount')
-    },[pagechange])
+        setPosts(allPosts);
+    }, [allPosts, change]);
 
+    useEffect(() => {
+        console.log('mount');
+    }, [pageChange]);
 
     useEffect(() => {
         const handleScreenChange = () => {
-          if(currentVideoRes.current) currentVideoRes.current.stop();
-          isScrollTab.current = false; 
+            if (currentVideoRes.current) currentVideoRes.current.stop();
+            isScrollTab.current = false;
         };
 
-        const handleFocus = (e) => {
-            
-                isScrollTab.current = true; 
-                if(currentVideoRes.current) currentVideoRes.current.play(); 
-            
-        }
+        const handleFocus = () => {
+            isScrollTab.current = true;
+            if (currentVideoRes.current) currentVideoRes.current.play();
+        };
 
-        
-    
-        // Add event listeners for screen focus/change
-      
         const unsubscribeBlur = navigation.addListener('blur', handleScreenChange);
-        const unsubscribeFocus = navigation.addListener('focus',handleFocus );
-    
-        // Clean up event listeners on component unmount
+        const unsubscribeFocus = navigation.addListener('focus', handleFocus);
+
         return () => {
             unsubscribeFocus();
             unsubscribeBlur();
         };
     }, [navigation]);
 
-
-    
-   
-    const onViewableItemsChanged = useRef(({changed}) => {
-
+    const onViewableItemsChanged = useRef(({ changed }) => {
         changed.forEach(element => {
-            const cell = mediaRefs.current[element.key]
-            
+            const cell = mediaRefs.current[element.key];
             if (cell) {
                 if (element.isViewable && isScrollTab.current) {
                     for (let index = 0; index < storeCellRef.current.length; index++) {
                         const cell = storeCellRef.current[index];
                         cell.stop();
                     }
-                    cell.play()
+                    cell.play();
                     currentVideoRes.current = cell;
                     storeCellRef.current.push(cell);
                 } else {
-                    cell.stop()
+                    cell.stop();
                 }
             }
-            
         });
-
-    })
-
-
-
-  
+    });
 
     const feedItemHeight = Dimensions.get('window').height - useMaterialNavBarHeight(profile);
 
-    const renderItem = ({ item, index }) => {
+    const renderItem = ({ item }) => {
         return (
             <View style={{ height: feedItemHeight, backgroundColor: 'black' }}>
-                <PostSingle item={item} ref={PostSingleRef => (mediaRefs.current[item.id] = PostSingleRef)} />
+                <PostSingle item={item} ref={ref => (mediaRefs.current[item.id] = ref)} />
             </View>
-        )
-    }
+        );
+    };
 
-   
-
-
-       
-      return (
+    return (
         <FlatList
             windowSize={4}
             data={posts}
@@ -122,14 +85,16 @@ export default function Scroller({ posts:allposts,change,profile }) {
             }}
             pagingEnabled
             decelerationRate={'normal'}
-            onViewableItemsChanged={onViewableItemsChanged.current}
+            onViewableItemsChanged={onViewableItemsChanged.current} /*
+            to fix the audio leak bug
+            */
             keyExtractor={item => item.id}
             showsVerticalScrollIndicator={false}
             showsHorizontalScrollIndicator={false}
         />
-      );
+    );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1 }
-})
+});
