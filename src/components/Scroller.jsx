@@ -9,7 +9,6 @@ export default function Scroller({ posts: allPosts, change, profile }) {
     const [posts, setPosts] = useState(allPosts);
     const isScrollTab = useRef(true);
     const mediaRefs = useRef([]);
-    const storeCellRef = useRef([]);
     const currentVideoRes = useRef(null);
     const navigation = useNavigation();
 
@@ -43,23 +42,19 @@ export default function Scroller({ posts: allPosts, change, profile }) {
         };
     }, [navigation]);
 
-    const onViewableItemsChanged = useRef(({ changed }) => {
-        changed.forEach(element => {
-            const cell = mediaRefs.current[element.key];
-            if (cell) {
-                if (element.isViewable && isScrollTab.current) {
-                    for (let index = 0; index < storeCellRef.current.length; index++) {
-                        const cell = storeCellRef.current[index];
-                        cell.stop();
-                    }
-                    cell.play();
-                    currentVideoRes.current = cell;
-                    storeCellRef.current.push(cell);
-                } else {
-                    cell.stop();
-                }
+    const onViewableItemsChanged = useRef(({ viewableItems }) => {
+        if (viewableItems.length === 0) return;
+
+        const visibleItem = viewableItems[0];
+        const cell = mediaRefs.current[visibleItem.key];
+
+        if (cell && isScrollTab.current) {
+            if (currentVideoRes.current && currentVideoRes.current !== cell) {
+                currentVideoRes.current.stop();
             }
-        });
+            cell.play();
+            currentVideoRes.current = cell;
+        }
     });
 
     const feedItemHeight = Dimensions.get('window').height - useMaterialNavBarHeight(profile);
@@ -77,18 +72,18 @@ export default function Scroller({ posts: allPosts, change, profile }) {
             windowSize={4}
             data={posts}
             renderItem={renderItem}
-            itialNumToRender={0}
+            initialNumToRender={0}
             maxToRenderPerBatch={2}
             removeClippedSubviews
             viewabilityConfig={{
-                itemVisiblePercentThreshold: 0
+                itemVisiblePercentThreshold: 50 // Set a threshold to ensure that the video plays only when it's fully in view
             }}
             pagingEnabled
             decelerationRate={'normal'}
             onViewableItemsChanged={onViewableItemsChanged.current} /*
             to fix the audio leak bug
             */
-            keyExtractor={item => item.id}
+            keyExtractor={item => item.id.toString()}
             showsVerticalScrollIndicator={false}
             showsHorizontalScrollIndicator={false}
         />
