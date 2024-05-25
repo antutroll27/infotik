@@ -1,14 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, FlatList, View, StyleSheet } from 'react-native';
 import useMaterialNavBarHeight from '../hooks/useMaterialNavBarHeight';
-import PostSingle from './post';
+import PostSingle from './PostSingle'; // Make sure this import is correct
 import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 
 export default function Scroller({ posts: allPosts, change, profile }) {
     const [posts, setPosts] = useState(allPosts);
-    const isScrollTab = useRef(true);
-    const mediaRefs = useRef([]);
+    const mediaRefs = useRef(new Map());
     const currentVideoRes = useRef(null);
     const navigation = useNavigation();
 
@@ -25,11 +24,9 @@ export default function Scroller({ posts: allPosts, change, profile }) {
     useEffect(() => {
         const handleScreenChange = () => {
             if (currentVideoRes.current) currentVideoRes.current.stop();
-            isScrollTab.current = false;
         };
 
         const handleFocus = () => {
-            isScrollTab.current = true;
             if (currentVideoRes.current) currentVideoRes.current.play();
         };
 
@@ -42,30 +39,34 @@ export default function Scroller({ posts: allPosts, change, profile }) {
         };
     }, [navigation]);
 
-    const onViewableItemsChanged = useRef(({ viewableItems }) => {
-        if (viewableItems.length === 0) return;
-
-        const visibleItem = viewableItems[0];
-        const cell = mediaRefs.current[visibleItem.key];
-
-        if (cell && isScrollTab.current) {
-            if (currentVideoRes.current && currentVideoRes.current !== cell) {
-                currentVideoRes.current.stop();
+    const onViewableItemsChanged = useRef(({ viewableItems, changed }) => {
+        changed.forEach(element => {
+            const cell = mediaRefs.current.get(element.key);
+            if (cell) {
+                if (element.isViewable) {
+                    if (currentVideoRes.current && currentVideoRes.current !== cell) {
+                        currentVideoRes.current.stop();
+                    }
+                    cell.play();
+                    currentVideoRes.current = cell;
+                } else {
+                    cell.stop();
+                }
             }
-            cell.play();
-            currentVideoRes.current = cell;
-        }
+        });
     });
+
+    const viewabilityConfig = {
+        itemVisiblePercentThreshold: 50 // Ensure the video plays only when it's at least 50% in view
+    };
 
     const feedItemHeight = Dimensions.get('window').height - useMaterialNavBarHeight(profile);
 
-    const renderItem = ({ item }) => {
-        return (
-            <View style={{ height: feedItemHeight, backgroundColor: 'black' }}>
-                <PostSingle item={item} ref={ref => (mediaRefs.current[item.id] = ref)} />
-            </View>
-        );
-    };
+    const renderItem = ({ item }) => (
+        <View style={{ height: feedItemHeight, backgroundColor: 'black' }}>
+            <PostSingle item={item} ref={ref => mediaRefs.current.set(item.id, ref)} />
+        </View>
+    );
 
     return (
         <FlatList
@@ -75,15 +76,11 @@ export default function Scroller({ posts: allPosts, change, profile }) {
             initialNumToRender={0}
             maxToRenderPerBatch={2}
             removeClippedSubviews
-            viewabilityConfig={{
-                itemVisiblePercentThreshold: 50 // Set a threshold to ensure that the video plays only when it's fully in view
-            }}
+            viewabilityConfig={viewabilityConfig}
             pagingEnabled
-            decelerationRate={'normal'}
-            onViewableItemsChanged={onViewableItemsChanged.current} /*
-            to fix the audio leak bug
-            */
-            keyExtractor={item => item.id.toString()}
+            decelerationRate="normal"
+            onViewableItemsChanged={onViewableItemsChanged.current}
+            keyExtractor={item => item.id}
             showsVerticalScrollIndicator={false}
             showsHorizontalScrollIndicator={false}
         />
